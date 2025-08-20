@@ -50,11 +50,16 @@ class TaskList extends StatelessWidget {
             return Dismissible(
               key: Key(task.id),
               direction: DismissDirection.endToStart, // Swipe from right to left to dismiss
-              background: Container(
-                color: Colors.redAccent, // Red background when swiping to delete
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Icon(Icons.delete, color: Colors.white), // White delete icon
+              background: LayoutBuilder(
+                builder: (context, constraints) {
+                  return Container(
+                    color: Colors.redAccent, // Red background when swiping to delete
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    height: constraints.maxHeight, // match tile height
+                    child: const Icon(Icons.delete, color: Colors.white, size: 28), // White delete icon
+                  );
+                },
               ),
               onDismissed: (direction) async {
                 final (deleted, position) =
@@ -88,35 +93,38 @@ class TaskList extends StatelessWidget {
                           width: 1.0,
                         ),
                       ),
-                      child: CheckboxListTile(
-                        controlAffinity: ListTileControlAffinity.leading,
-                        title: Text(
-                          task.title,
-                          style: TextStyle(
-                            decoration: task.done
-                                ? TextDecoration.lineThrough
-                                : TextDecoration.none,
-                            fontStyle:
-                            task.done ? FontStyle.italic : FontStyle.normal,
-                            color: task.done
-                                ? colorScheme.onSurface.withOpacity(0.6)
-                                : colorScheme.onSurface,
+                      child: SizedBox(
+                        height: 56, // consistent tile height
+                        child: CheckboxListTile(
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: Text(
+                            task.title,
+                            style: TextStyle(
+                              decoration: task.done
+                                  ? TextDecoration.lineThrough
+                                  : TextDecoration.none,
+                              fontStyle:
+                              task.done ? FontStyle.italic : FontStyle.normal,
+                              color: task.done
+                                  ? colorScheme.onSurface.withOpacity(0.6)
+                                  : colorScheme.onSurface,
+                            ),
                           ),
+                          value: task.done,
+                          onChanged: (_) async {
+                            final previous = await taskProvider.toggleTask(task.id);
+                            final message = previous
+                                ? 'Task "${task.title}" marked as active.'
+                                : 'Task "${task.title}" marked as complete.';
+                            _showSnackBar(
+                              context,
+                              message,
+                              onUndo: () {
+                                taskProvider.undoToggle(task.id, previous);
+                              },
+                            );
+                          },
                         ),
-                        value: task.done,
-                        onChanged: (_) async {
-                          final previous = await taskProvider.toggleTask(task.id);
-                          final message = previous
-                              ? 'Task "${task.title}" marked as active.'
-                              : 'Task "${task.title}" marked as complete.';
-                          _showSnackBar(
-                            context,
-                            message,
-                            onUndo: () {
-                              taskProvider.undoToggle(task.id, previous);
-                            },
-                          );
-                        },
                       ),
                     ),
                   ),

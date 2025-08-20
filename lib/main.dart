@@ -82,12 +82,22 @@ class PocketTasksApp extends StatelessWidget {
               ),
             ),
             darkTheme: ThemeData(
-              // Dark theme configuration (can be further customized)
+              // Dark theme configuration
               colorScheme: ColorScheme.fromSeed(
                 seedColor: Colors.deepPurple,
                 brightness: Brightness.dark,
               ),
               useMaterial3: true,
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.08),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
+                labelStyle: const TextStyle(color: Colors.white),
+              ),
             ),
             home: const PocketTasksPage(),
           );
@@ -248,6 +258,9 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
                 ],
               ),
             ),
+            const SizedBox(
+              height: 8,
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Consumer<TaskProvider>(
@@ -258,55 +271,76 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
                       Builder(builder: (context) {
                         final colorScheme = Theme.of(context).colorScheme;
                         final selected = provider.filter == TaskFilter.all;
-                        return FilterChip(
-                          selected: selected,
-                          selectedColor: colorScheme.primary,
-                          checkmarkColor: colorScheme.onPrimary,
-                          label: Text(
-                            'All',
-                            style: TextStyle(
-                              color: selected
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurface,
+                        return SizedBox(
+                          height: 40,
+                          child: FilterChip(
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            selected: selected,
+                            selectedColor: colorScheme.primary,
+                            checkmarkColor: colorScheme.onPrimary,
+                            label: Text(
+                              'All',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface,
+                              ),
                             ),
+                            onSelected: (_) => provider.setFilter(TaskFilter.all),
                           ),
-                          onSelected: (_) => provider.setFilter(TaskFilter.all),
                         );
                       }),
                       Builder(builder: (context) {
                         final colorScheme = Theme.of(context).colorScheme;
                         final selected = provider.filter == TaskFilter.active;
-                        return FilterChip(
-                          selected: selected,
-                          selectedColor: colorScheme.primary,
-                          checkmarkColor: colorScheme.onPrimary,
-                          label: Text(
-                            'Active',
-                            style: TextStyle(
-                              color: selected
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurface,
+                        return SizedBox(
+                          height: 40,
+                          child: FilterChip(
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            selected: selected,
+                            selectedColor: colorScheme.primary,
+                            checkmarkColor: colorScheme.onPrimary,
+                            label: Text(
+                              'Active',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface,
+                              ),
                             ),
+                            onSelected: (_) => provider.setFilter(TaskFilter.active),
                           ),
-                          onSelected: (_) => provider.setFilter(TaskFilter.active),
                         );
                       }),
                       Builder(builder: (context) {
                         final colorScheme = Theme.of(context).colorScheme;
                         final selected = provider.filter == TaskFilter.done;
-                        return FilterChip(
-                          selected: selected,
-                          selectedColor: colorScheme.primary,
-                          checkmarkColor: colorScheme.onPrimary,
-                          label: Text(
-                            'Done',
-                            style: TextStyle(
-                              color: selected
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurface,
+                        return SizedBox(
+                          height: 40,
+                          child: FilterChip(
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            selected: selected,
+                            selectedColor: colorScheme.primary,
+                            checkmarkColor: colorScheme.onPrimary,
+                            label: Text(
+                              'Done',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface,
+                              ),
                             ),
+                            onSelected: (_) => provider.setFilter(TaskFilter.done),
                           ),
-                          onSelected: (_) => provider.setFilter(TaskFilter.done),
                         );
                       }),
                     ],
@@ -314,7 +348,7 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
                 },
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Expanded(
               child: Consumer<TaskProvider>(
                 builder: (context, provider, _) {
