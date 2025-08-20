@@ -1,89 +1,136 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'task_model.dart';
 
-class TaskProvider with ChangeNotifier {
-  List<Task> _tasks = [];
-  TaskFilter _currentFilter = TaskFilter.all;
-  String _searchQuery = '';
-  static const String _tasksKey = 'pocket_tasks_v1';
+class TaskProvider extends ChangeNotifier {
+  static const storageKey = 'pocket_tasks_v1';
 
-  List<Task> get tasks => _tasks;
-  TaskFilter get currentFilter => _currentFilter;
-  String get searchQuery => _searchQuery;
+  final List<Task> _tasks = [];
+  TaskFilter _filter = TaskFilter.all;
+  String _query = '';
+  Timer? _debounce;
 
-  List<Task> get filteredTasks {
-    Iterable<Task> filtered = _tasks;
-    if (_searchQuery.isNotEmpty) {
-      filtered = filtered.where((task) =>
-          task.title.toLowerCase().contains(_searchQuery.toLowerCase()));
+  // Public getters
+  List<Task> get tasks => List.unmodifiable(_tasks);
+  TaskFilter get filter => _filter;
+  String get query => _query;
+
+  // Derived view: filtered + searched
+  List<Task> get visibleTasks =>
+      applyFilters(_tasks, filter: _filter, query: _query);
+
+  int get totalCount => _tasks.length;
+  int get doneCount => _tasks.where((t) => t.done).length;
+
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(storageKey);
+    if (raw != null && raw.isNotEmpty) {
+      final loaded = Task.decodeList(raw);
+      _tasks
+        ..clear()
+        ..addAll(loaded);
     }
-    switch (_currentFilter) {
-      case TaskFilter.active:
-        filtered = filtered.where((task) => !task.isCompleted);
-        break;
-      case TaskFilter.done:
-        filtered = filtered.where((task) => task.isCompleted);
-        break;
+    notifyListeners();
+  }
+
+  Future<void> _persist() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(storageKey, Task.encodeList(_tasks));
+  }
+
+  Future<void> addTask(Task task) async {
+    _tasks.insert(0, task);
+    await _persist();
+    notifyListeners();
+  }
+
+  /// Toggle returns the previous value so UI can offer Undo.
+  Future<bool> toggleTask(String id) async {
+    final idx = _tasks.indexWhere((t) => t.id == id);
+    if (idx == -1) return false;
+    final prev = _tasks[idx];
+    _tasks[idx] = prev.copyWith(done: !prev.done);
+    await _persist();
+    notifyListeners();
+    return prev.done; // return previous state for undo
+  }
+
+  /// Delete returns (deletedTask, index) for Undo.
+  Future<(Task?, int)> deleteTask(String id) async {
+    final idx = _tasks.indexWhere((t) => t.id == id);
+    if (idx == -1) return (null, -1);
+    final removed = _tasks.removeAt(idx);
+    await _persist();
+    notifyListeners();
+    return (removed, idx);
+  }
+
+  Future<void> undoToggle(String id, bool previousValue) async {
+    final idx = _tasks.indexWhere((t) => t.id == id);
+    if (idx == -1) return;
+    _tasks[idx] = _tasks[idx].copyWith(done: previousValue);
+    await _persist();
+    notifyListeners();
+  }
+
+  Future<void> undoDelete(Task task, int index) async {
+    if (index < 0 || index > _tasks.length) {
+      _tasks.insert(0, task);
+    } else {
+      _tasks.insert(index, task);
+    }
+    await _persist();
+    notifyListeners();
+  }
+
+  void setFilter(TaskFilter value) {
+    if (_filter == value) return;
+    _filter = value;
+    notifyListeners();
+  }
+
+  /// Debounced (300ms) search query setter
+  void setQuery(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _query = value;
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  /// Pure helper used by tests, does not touch persistence.
+  static List<Task> applyFilters(List<Task> input,
+      {TaskFilter filter = TaskFilter.all, String query = ''}) {
+    final q = query.trim().toLowerCase();
+    Iterable<Task> out = input;
+
+    if (q.isNotEmpty) {
+      out = out.where((t) => t.title.toLowerCase().contains(q));
+    }
+    switch (filter) {
       case TaskFilter.all:
         break;
+      case TaskFilter.active:
+        out = out.where((t) => !t.done);
+        break;
+      case TaskFilter.done:
+        out = out.where((t) => t.done);
+        break;
     }
-    return filtered.toList();
-  }
-
-  double get completionProgress {
-    if (_tasks.isEmpty) {
-      return 0.0;
-    }
-    final completedCount = _tasks.where((task) => task.isCompleted).length;
-    return completedCount / _tasks.length;
-  }
-
-  Future<void> loadTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonString = prefs.getString(_tasksKey);
-    if (jsonString != null) {
-      final List<dynamic> jsonList = json.decode(jsonString);
-      _tasks = jsonList.map((json) => Task.fromJson(json)).toList();
-      notifyListeners();
-    }
-  }
-
-  Future<void> _saveTasks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = _tasks.map((task) => task.toJson()).toList();
-    await prefs.setString(_tasksKey, json.encode(jsonList));
-  }
-
-  void addTask(Task task) {
-    _tasks.add(task);
-    _saveTasks();
-    notifyListeners();
-  }
-
-  void removeTask(Task task) {
-    _tasks.removeWhere((t) => t.id == task.id);
-    _saveTasks();
-    notifyListeners();
-  }
-
-  void toggleTaskCompletion(Task task) {
-    final index = _tasks.indexWhere((t) => t.id == task.id);
-    if (index != -1) {
-      _tasks[index].isCompleted = !_tasks[index].isCompleted;
-      _saveTasks();
-      notifyListeners();
-    }
-  }
-
-  void setFilter(TaskFilter filter) {
-    _currentFilter = filter;
-    notifyListeners();
-  }
-
-  void setSearchQuery(String query) {
-    _searchQuery = query;
-    notifyListeners();
+    // Stable order: newest first by createdAt desc (then id for tie-break)
+    final list = out.toList()
+      ..sort((a, b) {
+        final cmp = b.createdAt.compareTo(a.createdAt);
+        return cmp != 0 ? cmp : b.id.compareTo(a.id);
+      });
+    return list;
   }
 }

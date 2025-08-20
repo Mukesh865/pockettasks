@@ -6,7 +6,8 @@ import 'task_model.dart';
 class TaskList extends StatelessWidget {
   const TaskList({super.key});
 
-  void _showSnackBar(BuildContext context, String message, {VoidCallback? onUndo}) {
+  void _showSnackBar(BuildContext context, String message,
+      {VoidCallback? onUndo}) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -25,11 +26,16 @@ class TaskList extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<TaskProvider>(
       builder: (context, taskProvider, child) {
-        final tasks = taskProvider.filteredTasks;
+        final tasks = taskProvider.visibleTasks;
+
         if (tasks.isEmpty && taskProvider.tasks.isNotEmpty) {
-          return const Center(child: Text('No tasks match the current filter or search.'));
+          return const Center(
+              child: Text('No tasks match the current filter or search.',
+                  style: TextStyle(color: Colors.white70)));
         } else if (tasks.isEmpty) {
-          return const Center(child: Text('No tasks yet! Add one above.'));
+          return const Center(
+              child: Text('No tasks yet! Add one above.',
+                  style: TextStyle(color: Colors.white70)));
         }
 
         return ListView.builder(
@@ -38,46 +44,62 @@ class TaskList extends StatelessWidget {
             final task = tasks[index];
             return Dismissible(
               key: Key(task.id),
-              direction: DismissDirection.horizontal,
-              onDismissed: (direction) {
-                taskProvider.removeTask(task);
-                _showSnackBar(
-                  context,
-                  'Task "${task.title}" deleted.',
-                  onUndo: () {
-                    taskProvider.addTask(task); // Re-add the task on undo
-                  },
-                );
-              },
+              direction: DismissDirection.endToStart,
               background: Container(
-                color: Colors.red,
+                color: Colors.redAccent,
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: const Icon(Icons.delete, color: Colors.white),
               ),
-              child: Card(
-                elevation: 1,
-                margin: const EdgeInsets.symmetric(vertical: 4),
+              onDismissed: (direction) async {
+                final (deleted, position) =
+                await taskProvider.deleteTask(task.id);
+                if (deleted != null) {
+                  _showSnackBar(
+                    context,
+                    'Task "${deleted.title}" deleted.',
+                    onUndo: () {
+                      taskProvider.undoDelete(deleted, position);
+                    },
+                  );
+                }
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.15), width: 1),
+                ),
                 child: CheckboxListTile(
+                  controlAffinity: ListTileControlAffinity.leading,
                   title: Text(
                     task.title,
                     style: TextStyle(
-                      decoration: task.isCompleted
+                      decoration: task.done
                           ? TextDecoration.lineThrough
                           : TextDecoration.none,
-                      fontStyle: task.isCompleted ? FontStyle.italic : FontStyle.normal,
-                      color: task.isCompleted
-                          ? Theme.of(context).colorScheme.onSurface.withOpacity(0.6)
-                          : null,
+                      fontStyle:
+                      task.done ? FontStyle.italic : FontStyle.normal,
+                      color: task.done
+                          ? Colors.white70
+                          : Colors.white, // pop against gradient
                     ),
                   ),
-                  value: task.isCompleted,
-                  onChanged: (_) {
-                    taskProvider.toggleTaskCompletion(task);
-                    final message = task.isCompleted
-                        ? 'Task "${task.title}" marked as complete.'
-                        : 'Task "${task.title}" marked as active.';
-                    _showSnackBar(context, message);
+                  value: task.done,
+                  onChanged: (_) async {
+                    final previous = await taskProvider.toggleTask(task.id);
+                    final message = previous
+                        ? 'Task "${task.title}" marked as active.'
+                        : 'Task "${task.title}" marked as complete.';
+                    _showSnackBar(
+                      context,
+                      message,
+                      onUndo: () {
+                        taskProvider.undoToggle(task.id, previous);
+                      },
+                    );
                   },
                 ),
               ),

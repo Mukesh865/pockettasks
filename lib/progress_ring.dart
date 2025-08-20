@@ -1,102 +1,95 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'task_provider.dart';
 
 class ProgressRing extends StatelessWidget {
-  const ProgressRing({super.key});
+  final int total;
+  final int done;
+  final double size;
+  final double strokeWidth;
+
+  const ProgressRing({
+    super.key,
+    required this.total,
+    required this.done,
+    this.size = 56,
+    this.strokeWidth = 6,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<TaskProvider>(
-      builder: (context, taskProvider, child) {
-        final progress = taskProvider.completionProgress;
-        final colorScheme = Theme.of(context).colorScheme;
-        return Tooltip(
-          message: '${(progress * 100).toStringAsFixed(0)}% Complete',
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: CustomPaint(
-              painter: _ProgressRingPainter(
-                progress: progress,
-                primaryColor: colorScheme.primary,
-                backgroundColor: colorScheme.secondaryContainer,
-              ),
+    final progress =
+    total <= 0 ? 0.0 : (done.clamp(0, total)) / total.toDouble();
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _RingPainter(
+          background: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+          foreground: Theme.of(context).colorScheme.secondary,
+          progress: progress,
+          strokeWidth: strokeWidth,
+        ),
+        child: Center(
+          child: Text(
+            total == 0 ? '0%' : '${(progress * 100).round()}%',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white, // ensure visible on gradient
+              fontWeight: FontWeight.bold,
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _ProgressRingPainter extends CustomPainter {
+class _RingPainter extends CustomPainter {
+  final Color background;
+  final Color foreground;
   final double progress;
-  final Color primaryColor;
-  final Color backgroundColor;
+  final double strokeWidth;
 
-  _ProgressRingPainter({
+  _RingPainter({
+    required this.background,
+    required this.foreground,
     required this.progress,
-    required this.primaryColor,
-    required this.backgroundColor,
+    required this.strokeWidth,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final strokeWidth = 5.0;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2 - strokeWidth / 2;
+    final center = size.center(Offset.zero);
+    final radius = (math.min(size.width, size.height) - strokeWidth) / 2;
 
-    // Background circle
-    final backgroundPaint = Paint()
-      ..color = backgroundColor
+    final bgPaint = Paint()
       ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..color = background
       ..strokeWidth = strokeWidth;
-    canvas.drawCircle(center, radius, backgroundPaint);
 
-    // Progress arc
-    final progressPaint = Paint()
-      ..color = primaryColor
+    final fgPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round;
-    const double sweepAngle = 2 * 3.14159265359;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -3.14159265359 / 2, // Start angle at top
-      sweepAngle * progress,
-      false,
-      progressPaint,
-    );
+      ..strokeCap = StrokeCap.round
+      ..color = foreground
+      ..strokeWidth = strokeWidth;
 
-    // Text for percentage
-    final textSpan = TextSpan(
-      text: '${(progress * 100).toStringAsFixed(0)}',
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: primaryColor,
-      ),
-    );
-    final textPainter = TextPainter(
-      text: textSpan,
-      textAlign: TextAlign.center,
-      textDirection: TextDirection.ltr,
-    );
-    textPainter.layout(minWidth: 0, maxWidth: size.width);
-    textPainter.paint(
-      canvas,
-      Offset(
-        center.dx - textPainter.width / 2,
-        center.dy - textPainter.height / 2,
-      ),
-    );
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    // Background circle
+    canvas.drawArc(rect, -math.pi / 2, math.pi * 2, false, bgPaint);
+
+    // Foreground arc for progress
+    final sweep = (math.pi * 2) * progress.clamp(0.0, 1.0);
+    if (sweep > 0) {
+      canvas.drawArc(rect, -math.pi / 2, sweep, false, fgPaint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant _ProgressRingPainter oldDelegate) {
+  bool shouldRepaint(covariant _RingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.primaryColor != primaryColor ||
-        oldDelegate.backgroundColor != backgroundColor;
+        oldDelegate.background != background ||
+        oldDelegate.foreground != foreground ||
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
