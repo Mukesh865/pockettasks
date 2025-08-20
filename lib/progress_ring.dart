@@ -20,21 +20,29 @@ class ProgressRing extends StatelessWidget {
     final progress =
     total <= 0 ? 0.0 : (done.clamp(0, total)) / total.toDouble();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final backgroundColor = Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3);
+    final foregroundColor = isDark
+        ? Theme.of(context).colorScheme.secondary   // brighter for dark mode
+        : Theme.of(context).colorScheme.primary;   // primary for light mode
+    final textColor = isDark ? Colors.white : Colors.black87;
+
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _RingPainter(
-          background: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
-          foreground: Theme.of(context).colorScheme.secondary,
+          background: backgroundColor,
+          foreground: foregroundColor,
           progress: progress,
           strokeWidth: strokeWidth,
         ),
         child: Center(
           child: Text(
-            total == 0 ? '0%' : '${(progress * 100).round()}%',
+            '$done/$total',
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Colors.white, // ensure visible on gradient
+              color: textColor,
               fontWeight: FontWeight.bold,
             ),
           ),

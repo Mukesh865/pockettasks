@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import 'task_model.dart';
@@ -158,11 +156,36 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('PocketTasks'),
-        centerTitle: false,
-        actions: [
+    // Adaptive gradient that matches light/dark mode
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final List<Color> gradientColors = isDark
+        ? const [
+            Color(0xFF2E005C), // deep violet
+            Color(0xFF6A1B9A), // purple accent
+            Color(0xFF8E24AA), // lighter purple
+          ]
+        : const [
+            Color(0xFFEDE7F6), // light lavender
+            Color(0xFFD1C4E9), // soft purple
+            Color(0xFFB39DDB), // medium purple
+          ];
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('PocketTasks'),
+          centerTitle: false,
+          actions: [
           // Progress Ring showing task completion
           Consumer<TaskProvider>(
             builder: (_, provider, __) => Padding(
@@ -191,11 +214,11 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
             },
           ),
           const SizedBox(width: 8), // Small spacing after the icon button
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
+          ],
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
               child: Row(
@@ -205,7 +228,7 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
                       controller: _controller,
                       focusNode: _focus,
                       decoration: InputDecoration(
-                        labelText: 'Add a new task',
+                        labelText: 'Add task or Search',
                         hintText: 'e.g. Buy milk, read book...',
                         errorText: _error, // Display inline error message
                       ),
@@ -232,21 +255,60 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
                   return Wrap(
                     spacing: 8, // Spacing between filter chips
                     children: [
-                      FilterChip(
-                        label: const Text('All'),
-                        selected: provider.filter == TaskFilter.all,
-                        onSelected: (_) => provider.setFilter(TaskFilter.all),
-                      ),
-                      FilterChip(
-                        label: const Text('Active'),
-                        selected: provider.filter == TaskFilter.active,
-                        onSelected: (_) => provider.setFilter(TaskFilter.active),
-                      ),
-                      FilterChip(
-                        label: const Text('Done'),
-                        selected: provider.filter == TaskFilter.done,
-                        onSelected: (_) => provider.setFilter(TaskFilter.done),
-                      ),
+                      Builder(builder: (context) {
+                        final colorScheme = Theme.of(context).colorScheme;
+                        final selected = provider.filter == TaskFilter.all;
+                        return FilterChip(
+                          selected: selected,
+                          selectedColor: colorScheme.primary,
+                          checkmarkColor: colorScheme.onPrimary,
+                          label: Text(
+                            'All',
+                            style: TextStyle(
+                              color: selected
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                          onSelected: (_) => provider.setFilter(TaskFilter.all),
+                        );
+                      }),
+                      Builder(builder: (context) {
+                        final colorScheme = Theme.of(context).colorScheme;
+                        final selected = provider.filter == TaskFilter.active;
+                        return FilterChip(
+                          selected: selected,
+                          selectedColor: colorScheme.primary,
+                          checkmarkColor: colorScheme.onPrimary,
+                          label: Text(
+                            'Active',
+                            style: TextStyle(
+                              color: selected
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                          onSelected: (_) => provider.setFilter(TaskFilter.active),
+                        );
+                      }),
+                      Builder(builder: (context) {
+                        final colorScheme = Theme.of(context).colorScheme;
+                        final selected = provider.filter == TaskFilter.done;
+                        return FilterChip(
+                          selected: selected,
+                          selectedColor: colorScheme.primary,
+                          checkmarkColor: colorScheme.onPrimary,
+                          label: Text(
+                            'Done',
+                            style: TextStyle(
+                              color: selected
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurface,
+                            ),
+                          ),
+                          onSelected: (_) => provider.setFilter(TaskFilter.done),
+                        );
+                      }),
                     ],
                   );
                 },
@@ -266,6 +328,7 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
           ],
         ),
       ),
+    ),
     );
   }
 }

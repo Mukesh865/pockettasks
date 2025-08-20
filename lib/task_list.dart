@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:ui'; // Import for ImageFilter
 import 'task_provider.dart';
 import 'task_model.dart';
 
@@ -68,40 +69,57 @@ class TaskList extends StatelessWidget {
                   );
                 }
               },
-              child: Card(
-                // Card widget automatically adapts to theme colors
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                elevation: 2, // Added a slight elevation for better visual separation
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Rounded corners for consistency
-                child: CheckboxListTile(
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: Text(
-                    task.title,
-                    style: TextStyle(
-                      decoration: task.done
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                      fontStyle:
-                      task.done ? FontStyle.italic : FontStyle.normal,
-                      color: task.done
-                          ? colorScheme.onSurface.withOpacity(0.6) // Lighter text for done tasks
-                          : colorScheme.onSurface, // Default text color for active tasks
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                child: ClipRRect( // ClipRRect is essential for rounded corners with BackdropFilter
+                  borderRadius: BorderRadius.circular(12),
+                  child: BackdropFilter( // Apply blur to the background
+                    filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2), // Adjust sigmaX and sigmaY for blur intensity
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white.withOpacity(0.1) // Subtle white tint for dark mode
+                            : Colors.black.withOpacity(0.05), // Subtle black tint for light mode
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withOpacity(0.2) // Border for glass effect
+                              : Colors.black.withOpacity(0.1),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: CheckboxListTile(
+                        controlAffinity: ListTileControlAffinity.leading,
+                        title: Text(
+                          task.title,
+                          style: TextStyle(
+                            decoration: task.done
+                                ? TextDecoration.lineThrough
+                                : TextDecoration.none,
+                            fontStyle:
+                            task.done ? FontStyle.italic : FontStyle.normal,
+                            color: task.done
+                                ? colorScheme.onSurface.withOpacity(0.6)
+                                : colorScheme.onSurface,
+                          ),
+                        ),
+                        value: task.done,
+                        onChanged: (_) async {
+                          final previous = await taskProvider.toggleTask(task.id);
+                          final message = previous
+                              ? 'Task "${task.title}" marked as active.'
+                              : 'Task "${task.title}" marked as complete.';
+                          _showSnackBar(
+                            context,
+                            message,
+                            onUndo: () {
+                              taskProvider.undoToggle(task.id, previous);
+                            },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                  value: task.done,
-                  onChanged: (_) async {
-                    final previous = await taskProvider.toggleTask(task.id);
-                    final message = previous
-                        ? 'Task "${task.title}" marked as active.'
-                        : 'Task "${task.title}" marked as complete.';
-                    _showSnackBar(
-                      context,
-                      message,
-                      onUndo: () {
-                        taskProvider.undoToggle(task.id, previous);
-                      },
-                    );
-                  },
                 ),
               ),
             );
