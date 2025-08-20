@@ -6,8 +6,7 @@ import 'task_model.dart';
 class TaskList extends StatelessWidget {
   const TaskList({super.key});
 
-  void _showSnackBar(BuildContext context, String message,
-      {VoidCallback? onUndo}) {
+  void _showSnackBar(BuildContext context, String message, {VoidCallback? onUndo}) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -27,15 +26,20 @@ class TaskList extends StatelessWidget {
     return Consumer<TaskProvider>(
       builder: (context, taskProvider, child) {
         final tasks = taskProvider.visibleTasks;
+        final colorScheme = Theme.of(context).colorScheme;
 
         if (tasks.isEmpty && taskProvider.tasks.isNotEmpty) {
-          return const Center(
-              child: Text('No tasks match the current filter or search.',
-                  style: TextStyle(color: Colors.white70)));
+          return Center(
+              child: Text(
+                'No tasks match the current filter or search.',
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+              ));
         } else if (tasks.isEmpty) {
-          return const Center(
-              child: Text('No tasks yet! Add one above.',
-                  style: TextStyle(color: Colors.white70)));
+          return Center(
+              child: Text(
+                'No tasks yet! Add one above.',
+                style: TextStyle(color: colorScheme.onSurface.withOpacity(0.7)),
+              ));
         }
 
         return ListView.builder(
@@ -44,12 +48,12 @@ class TaskList extends StatelessWidget {
             final task = tasks[index];
             return Dismissible(
               key: Key(task.id),
-              direction: DismissDirection.endToStart,
+              direction: DismissDirection.endToStart, // Swipe from right to left to dismiss
               background: Container(
-                color: Colors.redAccent,
+                color: Colors.redAccent, // Red background when swiping to delete
                 alignment: Alignment.centerRight,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: const Icon(Icons.delete, color: Colors.white),
+                child: const Icon(Icons.delete, color: Colors.white), // White delete icon
               ),
               onDismissed: (direction) async {
                 final (deleted, position) =
@@ -64,14 +68,11 @@ class TaskList extends StatelessWidget {
                   );
                 }
               },
-              child: Container(
+              child: Card(
+                // Card widget automatically adapts to theme colors
                 margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.15), width: 1),
-                ),
+                elevation: 2, // Added a slight elevation for better visual separation
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), // Rounded corners for consistency
                 child: CheckboxListTile(
                   controlAffinity: ListTileControlAffinity.leading,
                   title: Text(
@@ -83,8 +84,8 @@ class TaskList extends StatelessWidget {
                       fontStyle:
                       task.done ? FontStyle.italic : FontStyle.normal,
                       color: task.done
-                          ? Colors.white70
-                          : Colors.white, // pop against gradient
+                          ? colorScheme.onSurface.withOpacity(0.6) // Lighter text for done tasks
+                          : colorScheme.onSurface, // Default text color for active tasks
                     ),
                   ),
                   value: task.done,

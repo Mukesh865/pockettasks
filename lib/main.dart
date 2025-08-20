@@ -1,7 +1,10 @@
-import 'dart:math';
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+
 import 'task_model.dart';
 import 'task_provider.dart';
 import 'task_list.dart';
@@ -12,27 +15,85 @@ void main() {
   runApp(const PocketTasksApp());
 }
 
+// A simple provider to manage the app's ThemeMode
+class ThemeProvider with ChangeNotifier {
+  ThemeMode _themeMode = ThemeMode.system; // Default to system theme
+
+  ThemeMode get themeMode => _themeMode;
+
+  void toggleTheme() {
+    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+    notifyListeners(); // Notify listeners to rebuild the UI with the new theme
+  }
+}
+
 class PocketTasksApp extends StatelessWidget {
   const PocketTasksApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => TaskProvider()..load(),
-      child: MaterialApp(
-        title: 'PocketTasks',
-        themeMode: ThemeMode.system,
-        theme: ThemeData(
-          colorSchemeSeed: Colors.teal,
-          brightness: Brightness.light,
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorSchemeSeed: Colors.teal,
-          brightness: Brightness.dark,
-          useMaterial3: true,
-        ),
-        home: const PocketTasksPage(),
+    return MultiProvider(
+      providers: [
+        // Provide the ThemeProvider to manage theme state
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        // Provide the TaskProvider to manage task data
+        ChangeNotifierProvider(create: (_) => TaskProvider()..load()),
+      ],
+      // Consume the ThemeProvider to rebuild MaterialApp when theme changes
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'PocketTasks',
+            themeMode: themeProvider.themeMode, // Use the theme mode from ThemeProvider
+            theme: ThemeData(
+              // Light theme configuration
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.deepPurple, // A consistent seed color
+                brightness: Brightness.light,
+              ),
+              useMaterial3: true,
+              scaffoldBackgroundColor: Colors.white, // Clean white background
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Colors.white, // White AppBar
+                elevation: 0.5, // Subtle shadow for AppBar
+                iconTheme: IconThemeData(color: Colors.black87), // Dark icons
+                titleTextStyle: TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold), // Dark title text
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: Colors.grey.shade100, // Light grey fill for text fields
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none, // No border line, relying on fill color
+                ),
+                hintStyle: TextStyle(color: Colors.grey.shade600), // Slightly darker hint text
+                labelStyle: const TextStyle(color: Colors.black), // Dark label text
+              ),
+              chipTheme: const ChipThemeData(
+                selectedColor: Colors.deepPurple, // Purple for selected chip
+                backgroundColor: Colors.white, // White background for unselected chips
+                labelStyle: TextStyle(color: Colors.deepPurple), // Purple label for selected, default for unselected
+                checkmarkColor: Colors.white, // White checkmark on selected chip
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.deepPurple, // Purple buttons
+                  foregroundColor: Colors.white, // White text on buttons
+                ),
+              ),
+            ),
+            darkTheme: ThemeData(
+              // Dark theme configuration (can be further customized)
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.deepPurple,
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+            ),
+            home: const PocketTasksPage(),
+          );
+        },
       ),
     );
   }
@@ -49,165 +110,167 @@ class _PocketTasksPageState extends State<PocketTasksPage> {
   final _controller = TextEditingController();
   final _focus = FocusNode();
   String? _error;
+  Timer? _searchDebounce; // Timer for debouncing search input
 
   @override
   void initState() {
     super.initState();
-    _controller.addListener(() {
-      context.read<TaskProvider>().setQuery(_controller.text);
-    });
+    // Listen for text changes in the search controller to implement debouncing
+    _controller.addListener(_onSearchChanged);
+    // Load tasks when the page initializes
+    context.read<TaskProvider>().load();
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _focus.dispose();
+    _searchDebounce?.cancel(); // Cancel any active debounce timer
     super.dispose();
+  }
+
+  // Handle search input changes with a debounce
+  void _onSearchChanged() {
+    if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel(); // Cancel previous timer
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      context.read<TaskProvider>().setQuery(_controller.text); // Update search query after delay
+    });
   }
 
   void _addTask() {
     final title = _controller.text.trim();
     if (title.isEmpty) {
-      setState(() => _error = 'Title cannot be empty');
-      _focus.requestFocus();
+      setState(() => _error = 'Title cannot be empty'); // Show error for empty title
+      _focus.requestFocus(); // Keep focus on the text field
       return;
     }
-    setState(() => _error = null);
-    final id = const Uuid().v4();
+    setState(() => _error = null); // Clear error if title is valid
+    final id = const Uuid().v4(); // Generate a unique ID for the task
     context.read<TaskProvider>().addTask(Task(
       id: id,
       title: title,
       done: false,
       createdAt: DateTime.now(),
     ));
-    _controller.clear();
+    _controller.clear(); // Clear text field after adding task
+    _focus.unfocus(); // Remove focus from text field
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF2E005C), // deep violet
-            Color(0xFF6A1B9A), // purple accent
-            Color(0xFF8E24AA), // lighter purple
-          ],
-        ),
-      ),
-      child: Scaffold(
-        backgroundColor: Colors.transparent, // show gradient
-        appBar: AppBar(
-          title: const Text('PocketTasks'),
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          actions: [
-            Consumer<TaskProvider>(
-              builder: (_, provider, __) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Center(
-                  child: ProgressRing(
-                    total: provider.totalCount,
-                    done: provider.doneCount,
-                    size: 40,
-                    strokeWidth: 5,
-                  ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('PocketTasks'),
+        centerTitle: false,
+        actions: [
+          // Progress Ring showing task completion
+          Consumer<TaskProvider>(
+            builder: (_, provider, __) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Center(
+                child: ProgressRing(
+                  total: provider.totalCount,
+                  done: provider.doneCount,
+                  size: 40,
+                  strokeWidth: 5,
                 ),
               ),
             ),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        focusNode: _focus,
-                        decoration: InputDecoration(
-                          labelText: 'Add or search tasks',
-                          hintText: 'e.g. Buy milk, read book...',
-                          errorText: _error,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                          filled: true,
-                          fillColor: Colors.white.withOpacity(0.1),
-                        ),
-                        style: const TextStyle(color: Colors.white),
-                        onSubmitted: (_) => _addTask(),
-                        textInputAction: TextInputAction.done,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Tooltip(
-                      message: 'Add task',
-                      child: ElevatedButton.icon(
-                        onPressed: _addTask,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add'),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Consumer<TaskProvider>(
-                  builder: (context, provider, _) {
-                    return Wrap(
-                      spacing: 8,
-                      children: [
-                        FilterChip(
-                          label: const Text('All', style: TextStyle(color: Colors.white)),
-                          selected: provider.filter == TaskFilter.all,
-                          selectedColor: Colors.teal,
-                          checkmarkColor: Colors.white,
-                          onSelected: (_) => provider.setFilter(TaskFilter.all),
-                        ),
-                        FilterChip(
-                          label: const Text('Active', style: TextStyle(color: Colors.white)),
-                          selected: provider.filter == TaskFilter.active,
-                          selectedColor: Colors.teal,
-                          checkmarkColor: Colors.white,
-                          onSelected: (_) => provider.setFilter(TaskFilter.active),
-                        ),
-                        FilterChip(
-                          label: const Text('Done', style: TextStyle(color: Colors.white)),
-                          selected: provider.filter == TaskFilter.done,
-                          selectedColor: Colors.teal,
-                          checkmarkColor: Colors.white,
-                          onSelected: (_) => provider.setFilter(TaskFilter.done),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: Consumer<TaskProvider>(
-                  builder: (context, provider, _) {
-                    if (provider.visibleTasks.isEmpty) {
-                      return const _EmptyState();
-                    }
-                    return TaskList();
-                  },
-                ),
-              ),
-            ],
           ),
+          // Theme toggle button
+          IconButton(
+            icon: Icon(
+              // Change icon based on current theme mode
+              Provider.of<ThemeProvider>(context).themeMode == ThemeMode.dark
+                  ? Icons.light_mode // Show light mode icon in dark theme
+                  : Icons.dark_mode, // Show dark mode icon in light theme
+            ),
+            onPressed: () {
+              // Toggle theme mode when button is pressed
+              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
+            },
+          ),
+          const SizedBox(width: 8), // Small spacing after the icon button
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focus,
+                      decoration: InputDecoration(
+                        labelText: 'Add a new task',
+                        hintText: 'e.g. Buy milk, read book...',
+                        errorText: _error, // Display inline error message
+                      ),
+                      onSubmitted: (_) => _addTask(), // Add task on pressing done/enter
+                      textInputAction: TextInputAction.done,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'Add task',
+                    child: ElevatedButton.icon(
+                      onPressed: _addTask,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Consumer<TaskProvider>(
+                builder: (context, provider, _) {
+                  return Wrap(
+                    spacing: 8, // Spacing between filter chips
+                    children: [
+                      FilterChip(
+                        label: const Text('All'),
+                        selected: provider.filter == TaskFilter.all,
+                        onSelected: (_) => provider.setFilter(TaskFilter.all),
+                      ),
+                      FilterChip(
+                        label: const Text('Active'),
+                        selected: provider.filter == TaskFilter.active,
+                        onSelected: (_) => provider.setFilter(TaskFilter.active),
+                      ),
+                      FilterChip(
+                        label: const Text('Done'),
+                        selected: provider.filter == TaskFilter.done,
+                        onSelected: (_) => provider.setFilter(TaskFilter.done),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Consumer<TaskProvider>(
+                builder: (context, provider, _) {
+                  if (provider.visibleTasks.isEmpty) {
+                    return const _EmptyState(); // Show empty state if no tasks
+                  }
+                  return const TaskList(); // Display the list of tasks
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+// Widget to display when there are no tasks
 class _EmptyState extends StatelessWidget {
   const _EmptyState();
 
