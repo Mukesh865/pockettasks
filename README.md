@@ -2,9 +2,9 @@
 
 A simple, cross-platform task management application built with Flutter.
 
-![PocketTasks Screenshot 1](pockettask1.jpg)
-![PocketTasks Screenshot 2](pockettask2.jpg)
-![PocketTasks Screenshot 3](pockettask3.jpg)
+![pockettask1](https://github.com/user-attachments/assets/a9ebb25f-7f7e-4554-80ad-f5ad879d7353)
+![pockettask2](https://github.com/user-attachments/assets/86363d5b-9d31-498c-876b-433813fc6c68)
+![pockettask3](https://github.com/user-attachments/assets/b10f9aa5-027e-484b-a54d-8fb711834bf5)
 
 ## Features
 
